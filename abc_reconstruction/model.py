@@ -19,7 +19,7 @@ class Model():
     def __init__(self, config_filename = 'XENON1T_ABC_all_pmts_on.ini'):
         # Get path to modified pax plugin
         model_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-        mod_dir = os.path.joni(model_dir, '..', 'pax_mod')
+        mod_dir = os.path.join(model_dir, '..', 'pax_mod')
         # Setup pax using a custom configuration 'XENON1T_ABC.ini'
         self.pax = Processor(config_paths = [config_filename],
                              config_dict = {'plugin_paths': [mod_dir]})
