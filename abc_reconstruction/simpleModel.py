@@ -34,7 +34,7 @@ class SimpleModel():
                                 adjust_to_qe=qes[top_pmts],
                                 default_errors=errors)
 
-    def __call__(self, x, y, n_obs = 500):
+    def __call__(self, x, y, n_obs = 500, batch_size = 1, random_state = None):
         """Returns a hitpattern of n_obs photo-electrons
            for given x, y position.
         """

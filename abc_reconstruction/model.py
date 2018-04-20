@@ -54,7 +54,7 @@ class Model():
                         }
         self.input_plugin.default_instruction = new_defaults.copy()
 
-    def __call__(self, x, y):
+    def __call__(self, x, y, batch_size = 1, random_state = None):
         """Returns a hitpattern of s2_electrons
            for given x, y interaction position.
         """
