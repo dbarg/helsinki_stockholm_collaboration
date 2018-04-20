@@ -1,5 +1,4 @@
 import os
-import inspect
 
 from pax.core import Processor
 
@@ -18,11 +17,12 @@ class Model():
 
     def __init__(self, config_filename = 'XENON1T_ABC_all_pmts_on.ini'):
         # Get path to modified pax plugin
-        model_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-        mod_dir = os.path.join(model_dir, '..', 'pax_mod')
+        this_dir = os.path.dirname(os.path.abspath(__file__))
+        mod_dir = os.path.join(this_dir, 'pax_mod')
+        config_path = os.path.join(this_dir, 'configuration', config_filename)
         # Setup pax using a custom configuration 'XENON1T_ABC.ini'
-        self.pax = Processor(config_paths = [config_filename],
-                             config_dict = {'plugin_paths': [mod_dir]})
+        self.pax = Processor(config_paths = [config_path],
+                             config_dict = {'pax':{'plugin_paths': [mod_dir]}})
         # Get access to the input plugin WaveformSimulatorInput
         # derived from the WaveformSimulator class
         self.input_plugin = self.pax.get_plugin_by_name('WaveformSimulatorInput')
