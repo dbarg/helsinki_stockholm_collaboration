@@ -15,7 +15,7 @@ class SimpleModel():
        be specified, this is set constant by default.
     """
 
-    def __init__(self):
+    def __init__(self, zoom_multiplier = 1):
         # Get some settings from the XENON1T detector configuration
         config = load_configuration('XENON1T')
         
@@ -30,7 +30,7 @@ class SimpleModel():
 
         # Set up the PatternFitter which sample the LCE maps
         self.pf = PatternFitter(filename=utils.data_file_name(lce_maps),
-                                zoom_factor=lce_map_zoom,
+                                zoom_factor=lce_map_zoom * zoom_multiplier,
                                 adjust_to_qe=qes[top_pmts],
                                 default_errors=errors)
 
