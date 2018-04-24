@@ -42,3 +42,9 @@ class Generator():
     
     def __call__(self):
         return self.model(*uniform_circle_rv(self.tpc_radius))
+
+def pol_to_cart(r, phi):
+    return r * np.cos(phi), r * np.sin(phi)
+
+def cart_to_pol(x, y):
+    return np.sqrt(x**2 + y**2), np.arctan2(y,x)
