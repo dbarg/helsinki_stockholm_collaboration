@@ -1,6 +1,10 @@
 import os
+import numpy as np
 
 from pax.core import Processor
+from pax.exceptions import CoordinateOutOfRangeException
+
+from .utils import pol_to_cart
 
 
 class Model():
@@ -15,7 +19,10 @@ class Model():
        main S2 of the event.
     """
 
-    def __init__(self, config_filename = 'XENON1T_ABC_all_pmts_on.ini'):
+    def __init__(self, config_filename = 'XENON1T_ABC_all_pmts_on.ini',
+                 coordinate_system = 'cartesian'):
+        # Set coord system
+        self.coordinate_system = coordinate_system
         # Get path to modified pax plugin
         this_dir = os.path.dirname(os.path.abspath(__file__))
         mod_dir = os.path.join(this_dir, 'pax_mod')
@@ -56,12 +63,17 @@ class Model():
 
     def __call__(self, x, y, batch_size = 1, random_state = None):
         """Returns a hitpattern of s2_electrons
-           for given x, y interaction position.
+           for given interaction position.
         """
+        if self.coordinate_system == 'polar':
+            x, y = pol_to_cart(x, y)
         # Set new x,y position
         self.input_plugin.set_instruction_for_next_event(x, y)
         # Run the waveformsimulator and pax processor
-        self.pax.run(clean_shutdown=False)
+        try:
+            self.pax.run(clean_shutdown=False)
+        except CoordinateOutOfRangeException:
+            return np.ones(127) * 1e6
         # Return the top hit pattern of the main S2 of the processed event
         return self.output_plugin.last_event.main_s2.area_per_channel[:127]
     
