@@ -44,6 +44,8 @@ class Model():
             self.pax.config['gain_sigmas'] = gain_sigmas
             self.input_plugin.config['gain_sigmas'] = gain_sigmas
             self.input_plugin.simulator.config['gain_sigmas'] = gain_sigmas
+
+        self.r_bound = self.pax.config['DEFAULT']['tpc_radius']
             
     
     def change_defaults(self, z = 0.0, t = 10000,
@@ -73,7 +75,16 @@ class Model():
         try:
             self.pax.run(clean_shutdown=False)
         except CoordinateOutOfRangeException:
-            return np.ones(127) * 1e6
+            # Move to edge
+            if self.coordinate_system == 'cartesian':
+                phi = np.arctan2(y, x)
+                x = self.r_bound * np.cos(phi)
+                y = self.r_bound * np.sin(phi)
+            else:
+                x = self.r_bound
+            self.input_plugin.set_instruction_for_next_event(x, y)
+            self.pax.run(clean_shutdown=False)
+
         # Return the top hit pattern of the main S2 of the processed event
         return self.output_plugin.last_event.main_s2.area_per_channel[:127]
     
