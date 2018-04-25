@@ -31,4 +31,8 @@ class BoundedNormal_y(elfi.Distribution):
 
     def pdf(y, x, r_bound, mean=None, cov=1):
         # Take norm pdf, so wrong normalization
-        return sps.norm.pdf(y, loc=mean[1], scale=np.sqrt(cov))
+        vals = sps.norm.pdf(y, loc=mean[1], scale=np.sqrt(cov))
+        # Check bounds
+        out_of_bounds = x**2 + y**2 > r_bound**2
+        vals[out_of_bounds] = 0
+        return vals
