@@ -46,6 +46,7 @@ class Model():
             self.input_plugin.simulator.config['gain_sigmas'] = gain_sigmas
 
         self.r_bound = self.pax.config['DEFAULT']['tpc_radius']
+        self.pmt_mask = np.array(self.pax.config['DEFAULT']['gains']) > 1
             
     
     def change_defaults(self, z = 0.0, t = 10000,
