@@ -75,15 +75,7 @@ class Model():
         try:
             self.pax.run(clean_shutdown=False)
         except CoordinateOutOfRangeException:
-            # Move to edge
-            if self.coordinate_system == 'cartesian':
-                phi = np.arctan2(y, x)
-                x = self.r_bound * np.cos(phi)
-                y = self.r_bound * np.sin(phi)
-            else:
-                x = self.r_bound
-            self.input_plugin.set_instruction_for_next_event(x, y)
-            self.pax.run(clean_shutdown=False)
+            return np.ones(127) * 1e3
 
         # Return the top hit pattern of the main S2 of the processed event
         return self.output_plugin.last_event.main_s2.area_per_channel[:127]
