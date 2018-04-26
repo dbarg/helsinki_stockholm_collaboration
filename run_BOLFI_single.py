@@ -26,6 +26,7 @@ def run_BOLFI_single(index, true_x, true_y):
     prior_pos = prior_mean(pattern)
 
     r_bound = 47.9
+    pmt_mask = model.pmt_mask[:127].astype(int)
 
     ### Build Priors
     px = elfi.Prior(BoundedNormal_x, r_bound, prior_pos, 64)
@@ -35,7 +36,7 @@ def run_BOLFI_single(index, true_x, true_y):
     model=elfi.tools.vectorize(model)
     Y = elfi.Simulator(model, px, py, observed=pattern)
 
-    d = elfi.Distance('euclidean', Y)
+    d = elfi.Distance('euclidean', Y, w=pmt_mask)
     log_d = elfi.Operation(np.log, d)
 
     ### Setup BOLFI
