@@ -43,12 +43,12 @@ def run_BOLFI_single(index, true_x, true_y):
             y = y[:,w.astype(bool)]
             n = n[:,w.astype(bool)]
 
-        n = np.clip(n, 1e-1, None)
-        y = np.clip(y, 1e-1, None)
+        n = np.clip(n, 1e-10, None)
+        y = np.clip(y, 1e-10, None)
         res = 2 * np.sum(y - n  + n * np.log(n/y), axis=1)
         lres = np.log(res)
-        if lres > 10:
-            lres = np.ones(lres.shape) * 9
+        #if lres > 10:
+        #    lres = np.ones(lres.shape) * 9
         return lres
 
     def chisquare(y, n, w=None):
@@ -71,15 +71,27 @@ def run_BOLFI_single(index, true_x, true_y):
         ds = [sps.ks_2samp(n[0], y[i])[0] for i in range(y.shape[0])]
         return np.array(ds)
 
-    #likelihood_chisquare_masked = partial(likelihood_chisquare, w=pmt_mask)
-    #log_d = elfi.Distance(likelihood_chisquare_masked, Y)
+    def sqrt_euclid(y, n, w=None):
+        if w is not None:
+            y = y[:,w.astype(bool)]
+            n = n[:,w.astype(bool)]
+
+        d = np.sum(np.sqrt(np.abs(y - n)), axis=1)
+        return d
+
+    likelihood_chisquare_masked = partial(likelihood_chisquare, w=pmt_mask)
+    log_d = elfi.Distance(likelihood_chisquare_masked, Y)
 
     #chisquare_masked = partial(chisquare, w=pmt_mask)
     #log_d = elfi.Distance(chisquare_masked, Y)
 
-    k2_test_masked = partial(k2_test, w=pmt_mask)
-    d = elfi.Distance(k2_test_masked, Y)
-    log_d = elfi.Operation(np.log, d)
+    #k2_test_masked = partial(k2_test, w=pmt_mask)
+    #d = elfi.Distance(k2_test_masked, Y)
+    #log_d = elfi.Operation(np.log, d)
+
+    #sqrt_euclid_masked = partial(sqrt_euclid, w=pmt_mask)
+    #d = elfi.Distance(sqrt_euclid_masked, Y)
+    #log_d = elfi.Operation(np.log, d)
 
     ### Setup BOLFI
     bolfi = elfi.BOLFI(log_d, batch_size=1, initial_evidence=20, update_interval=1,
