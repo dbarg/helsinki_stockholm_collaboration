@@ -11,10 +11,13 @@ import elfi
 
 from abc_reconstruction.model import Model
 from abc_reconstruction.prior import BoundedNormal_x, BoundedNormal_y
-from abc_reconstruction.utils import PriorPosition
+from abc_reconstruction.utils import PriorPosition, minimize, ConstraintLCBSC
+
+from elfi.methods.bo.gpy_regression import GPyRegression
+from elfi.methods.utils import ModelPrior
 
 
-def run_BOLFI_single(index, true_x, true_y):
+def run_BOLFI_single(index, true_x, true_y, folder):
     ### Setup
 
     model = Model('XENON1T_ABC.ini')
@@ -79,8 +82,8 @@ def run_BOLFI_single(index, true_x, true_y):
         d = np.sum(np.sqrt(np.abs(y - n)), axis=1)
         return d
 
-    likelihood_chisquare_masked = partial(likelihood_chisquare, w=pmt_mask)
-    log_d = elfi.Distance(likelihood_chisquare_masked, Y)
+    #likelihood_chisquare_masked = partial(likelihood_chisquare, w=pmt_mask)
+    #log_d = elfi.Distance(likelihood_chisquare_masked, Y)
 
     #chisquare_masked = partial(chisquare, w=pmt_mask)
     #log_d = elfi.Distance(chisquare_masked, Y)
@@ -93,16 +96,32 @@ def run_BOLFI_single(index, true_x, true_y):
     #d = elfi.Distance(sqrt_euclid_masked, Y)
     #log_d = elfi.Operation(np.log, d)
 
+    d = elfi.Distance('euclidean', Y, w=pmt_mask)
+    log_d = elfi.Operation(np.log, d)
+
     ### Setup BOLFI
+    bounds = {'px':(-r_bound, r_bound), 'py':(-r_bound, r_bound)}
+
+    target_model = GPyRegression(log_d.model.parameter_names,
+                                 bounds=bounds)
+
+    acquisition_method = ConstraintLCBSC(target_model,
+                                         prior=ModelPrior(log_d.model),
+                                         noise_var=[0.1, 0.1],
+                                         exploration_rate=10)
+
     bolfi = elfi.BOLFI(log_d, batch_size=1, initial_evidence=20, update_interval=1,
-                       bounds={'px':(-r_bound, r_bound), 'py':(-r_bound, r_bound)},
-                       acq_noise_var=[0.1, 0.1])
+                       # bounds=bounds,  # Not used when using target_model
+                       target_model=target_model,
+                       # acq_noise_var=[0.1, 0.1],  # Not used when using acq method
+                       acquisition_method=acquisition_method,
+                       )
 
     ### Run BOLFI
     post = bolfi.fit(n_evidence=200)
 
     bolfi.plot_discrepancy()
-    plt.savefig('bolfi_disc_%d.png' % index, dpi = 150)
+    plt.savefig(folder + 'bolfi_disc_%d.png' % index, dpi = 150)
     plt.close()
 
     result_BOLFI = bolfi.sample(1000, info_freq=1000)
@@ -119,12 +138,16 @@ def run_BOLFI_single(index, true_x, true_y):
     return pax_pos
 
 if __name__ == '__main__':
-    i = int(sys.argv[1])
-    print('Running BOLFI index', i)
+    if len(sys.argv) == 3:
+        i = int(sys.argv[1])
+        folder = sys.argv[2]
+        print('Running BOLFI index %d, storing results in %s' % (i, folder))
 
-    true_pos = np.loadtxt('data/truepos')
+        true_pos = np.loadtxt('data/truepos')
 
-    result = run_BOLFI_single(i, true_pos[i][0], true_pos[i][1])
+        result = run_BOLFI_single(i, true_pos[i][0], true_pos[i][1], folder)
 
-    with open("bolfi_result_%d.pkl" % i, 'wb') as f:
-        pickle.dump(result, f)
+        with open(folder + "bolfi_result_%d.pkl" % i, 'wb') as f:
+            pickle.dump(result, f)
+    else:
+        print("Usage: run_BOLFI_single.py index output_folder")
