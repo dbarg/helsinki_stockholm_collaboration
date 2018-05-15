@@ -166,6 +166,12 @@ class ConstraintLCBSC(LCBSC):
         # Create n copies of the minimum
         x = np.tile(xhat, (n, 1))
         # Add noise for more efficient fitting of GP
-        x = self._add_noise(x)
+        noise_x = self._add_noise(x)
 
-        return x
+        # But only within constraints
+        out_of_bounds = np.sum(noise_x**2, axis=1) > 47.9**2
+        while len(noise_x[out_of_bounds]) > 0:
+            noise_x[out_of_bounds, :] = self._add_noise(x[out_of_bounds, :])
+            out_of_bounds = np.sum(noise_x**2, axis=1) > 47.9**2
+
+        return noise_x
