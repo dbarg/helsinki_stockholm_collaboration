@@ -152,10 +152,11 @@ class ConstraintLCBSC(LCBSC):
         def grad_obj(x):
             return self.evaluate_gradient(x, t)
 
+        max_r = 47.7
         xhat, _ = minimize(
             obj,
             self.model.bounds,
-            ({'type': 'ineq', 'fun': lambda x : 47.9**2 - (x[0]**2 + x[1]**2)}),
+            ({'type': 'ineq', 'fun': lambda x : max_r**2 - (x[0]**2 + x[1]**2)}),
             'SLSQP',
             grad_obj,
             self.prior,
@@ -169,9 +170,9 @@ class ConstraintLCBSC(LCBSC):
         noise_x = self._add_noise(x)
 
         # But only within constraints
-        out_of_bounds = np.sum(noise_x**2, axis=1) > 47.9**2
+        out_of_bounds = np.sum(noise_x**2, axis=1) > max_r**2
         while len(noise_x[out_of_bounds]) > 0:
             noise_x[out_of_bounds, :] = self._add_noise(x[out_of_bounds, :])
-            out_of_bounds = np.sum(noise_x**2, axis=1) > 47.9**2
+            out_of_bounds = np.sum(noise_x**2, axis=1) > max_r**2
 
         return noise_x
