@@ -20,7 +20,7 @@ from elfi.methods.utils import ModelPrior
 def run_BOLFI_single(index, true_x, true_y, folder):
     ### Setup
 
-    model = Model('XENON1T_ABC.ini')
+    model = Model('XENON1T_ABC_all_pmts_on.ini')
     model.change_defaults(s2_electrons = 25)
 
     prior_mean = PriorPosition()
@@ -29,7 +29,7 @@ def run_BOLFI_single(index, true_x, true_y, folder):
     pax_pos = model.get_latest_pax_position()
     prior_pos = prior_mean(pattern)
 
-    r_bound = 47.9
+    r_bound = 47.8
     pmt_mask = model.pmt_mask[:127].astype(int)
 
     ### Build Priors
