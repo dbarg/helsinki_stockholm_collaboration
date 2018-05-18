@@ -144,7 +144,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
     prior_mean = PriorPosition()
 
     for index, truth in enumerate(true_pos[start:stop]):
-        print("Running BOLFI on index %d" % index + start)
+        print("Running BOLFI on index %d" % (index + start))
 
         # The pattern to reconstruct
         pattern = model(truth[0], truth[1])
