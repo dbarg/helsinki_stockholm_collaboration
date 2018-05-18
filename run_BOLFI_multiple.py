@@ -144,7 +144,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
     prior_mean = PriorPosition()
 
     for index, truth in enumerate(true_pos[start:stop]):
-        print("Running BOLFI on index %d" % index)
+        print("Running BOLFI on index %d" % index + start)
 
         # The pattern to reconstruct
         pattern = model(truth[0], truth[1])
@@ -166,12 +166,12 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         try:
             post = bolfi.fit(n_evidence=200)
         except:
-            bolfi.remove()
+            bolfi_model.remove()
             continue
 
         # Save the discrepancy plot
         bolfi.plot_discrepancy()
-        plt.savefig(folder + 'bolfi_disc_%d.png' % index, dpi = 150)
+        plt.savefig(folder + 'bolfi_disc_%d.png' % (index + start), dpi = 150)
         plt.close()
 
         # Save the surface plot
@@ -180,7 +180,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         plt.ylim(-50, 50)
         for ax in plt.gcf().axes:
                 ax.add_artist(plt.Circle((0,0), 47.9, color='red', fill=False, linestyle='--'))
-        plt.savefig(folder + 'bolfi_surf_%d.png' % index, dpi = 150)
+        plt.savefig(folder + 'bolfi_surf_%d.png' % (index + start), dpi = 150)
         plt.close()
 
         # Sample from the BOLFI fit
@@ -198,7 +198,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         pax_pos['BOLFI_median'] = {'x': medians[0], 'y': medians[1]}
 
         # Save the output
-        with open(folder + "bolfi_results_%d.pkl" % index, 'wb') as f:
+        with open(folder + "bolfi_results_%d.pkl" % (index + start), 'wb') as f:
             pickle.dump(pax_pos, f)
 
         # Remove the model graph from memory so it can be reused in the next iteration
