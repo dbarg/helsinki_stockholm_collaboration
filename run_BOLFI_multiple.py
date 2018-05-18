@@ -163,7 +163,11 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         bolfi = bolfi_model.build(min_model, pattern, prior_pos, pmt_mask=pmt_mask)
 
         # Run BOLFI
-        post = bolfi.fit(n_evidence=200)
+        try:
+            post = bolfi.fit(n_evidence=200)
+        except:
+            bolfi.remove()
+            continue
 
         # Save the discrepancy plot
         bolfi.plot_discrepancy()
