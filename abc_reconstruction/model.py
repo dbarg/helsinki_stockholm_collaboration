@@ -64,18 +64,23 @@ class Model():
                         }
         self.input_plugin.default_instruction = new_defaults.copy()
 
-    def __call__(self, x, y, batch_size = 1, random_state = None):
+    def __call__(self, x, y, z=None, s2_electrons=None, batch_size=1, random_state=None):
         """Returns a hitpattern of s2_electrons
            for given interaction position.
         """
         if self.coordinate_system == 'polar':
             x, y = pol_to_cart(x, y)
         # Set new x,y position
-        self.input_plugin.set_instruction_for_next_event(x, y)
+        self.input_plugin.set_instruction_for_next_event(x, y, z=z, s2_electrons=s2_electrons)
         # Run the waveformsimulator and pax processor
         try:
             self.pax.run(clean_shutdown=False)
+        except ValueError:
+            print("ValueError, x=%.2f, y=%.2f" % (x, y))
+            raise
         except CoordinateOutOfRangeException:
+            # Should not occur anymore with TPC bound in BOLFI sampling
+            print("CoordinateOutOfRangeException, x=%.2f, y=%.2f" % (x, y))
             return np.ones(127) * 1e3
 
         # Return the top hit pattern of the main S2 of the processed event
