@@ -45,9 +45,13 @@ class WaveformSimulatorInput(WaveformSimulator):
     def get_instructions_for_next_event(self):
         yield [self.instruction]
 
-    def set_instruction_for_next_event(self, x, y):
+    def set_instruction_for_next_event(self, x, y, z=None, s2_electrons=None):
         """recoil_type, x, y, z, t, s1_photons, s2_electrons, g4_id=-1
         """
         self.instruction = self.default_instruction.copy()
         self.instruction['x'] = x
         self.instruction['y'] = y
+        if z is not None:
+            self.instruction['z'] = str(z)
+        if s2_electrons is not None:
+            self.instruction['s2_electrons'] = str(s2_electrons)
