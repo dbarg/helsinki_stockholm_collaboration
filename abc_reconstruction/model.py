@@ -70,6 +70,10 @@ class Model():
         """
         if self.coordinate_system == 'polar':
             x, y = pol_to_cart(x, y)
+        if s2_electrons is not None:
+            # In case non-integer is passed
+            s2_electrons = int(np.round(float(s2_electrons)))
+
         # Set new x,y position
         self.input_plugin.set_instruction_for_next_event(x, y, z=z, s2_electrons=s2_electrons)
         # Run the waveformsimulator and pax processor
@@ -84,7 +88,13 @@ class Model():
             return np.ones(127) * 1e3
 
         # Return the top hit pattern of the main S2 of the processed event
-        return self.output_plugin.last_event.main_s2.area_per_channel[:127]
+        try:
+            out = self.output_plugin.last_event.main_s2.area_per_channel[:127]
+        except AttributeError:
+            # If no main S2 is found all light was lost, return an empty hitpattern
+            out = np.zeros(127)
+
+        return out
     
     def get_latest_pax_position(self):
         # Return the reconstructed positions by pax for the last
