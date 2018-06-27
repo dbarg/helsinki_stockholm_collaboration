@@ -175,7 +175,7 @@ class ConstraintLCBSC(LCBSC):
         noise_x = self._add_noise(x)
 
         ## But only within constraints if 2D
-        if len(x) < 3:
+        if len(xhat) < 3:
             out_of_bounds = np.sum(noise_x**2, axis=1) > max_r**2
             while len(noise_x[out_of_bounds]) > 0:
                 noise_x[out_of_bounds, :] = self._add_noise(x[out_of_bounds, :])
