@@ -129,6 +129,11 @@ class ConstraintLCBSC(LCBSC):
        minimizer to handle model constraint.
     """
 
+    def __init__(self, *args, delta=None, **kwargs):
+        super(ConstraintLCBSC, self).__init__(*args, delta=delta, **kwargs)
+        self.d0 = 0
+        self.d1 = 1
+
     def acquire(self, n, t=None):
         """Return the next batch of acquisition points.
         Gaussian noise ~N(0, self.noise_var) is added to the acquired points.
@@ -156,7 +161,7 @@ class ConstraintLCBSC(LCBSC):
         xhat, _ = minimize(
             obj,
             self.model.bounds,
-            ({'type': 'ineq', 'fun': lambda x : max_r**2 - (x[0]**2 + x[1]**2)}),
+            ({'type': 'ineq', 'fun': lambda x : max_r**2 - (x[self.d0]**2 + x[self.d1]**2)}),
             'SLSQP',
             grad_obj,
             self.prior,
@@ -169,10 +174,11 @@ class ConstraintLCBSC(LCBSC):
         # Add noise for more efficient fitting of GP
         noise_x = self._add_noise(x)
 
-        # But only within constraints
-        out_of_bounds = np.sum(noise_x**2, axis=1) > max_r**2
-        while len(noise_x[out_of_bounds]) > 0:
-            noise_x[out_of_bounds, :] = self._add_noise(x[out_of_bounds, :])
+        ## But only within constraints if 2D
+        if len(x) < 3:
             out_of_bounds = np.sum(noise_x**2, axis=1) > max_r**2
+            while len(noise_x[out_of_bounds]) > 0:
+                noise_x[out_of_bounds, :] = self._add_noise(x[out_of_bounds, :])
+                out_of_bounds = np.sum(noise_x**2, axis=1) > max_r**2
 
         return noise_x
