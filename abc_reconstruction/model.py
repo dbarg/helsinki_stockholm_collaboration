@@ -85,14 +85,14 @@ class Model():
         except CoordinateOutOfRangeException:
             # Should not occur anymore with TPC bound in BOLFI sampling
             print("CoordinateOutOfRangeException, x=%.2f, y=%.2f" % (x, y))
-            return np.ones(127) * 1e3
+            raise   # return np.ones(127) * 1e3
 
-        # Return the top hit pattern of the main S2 of the processed event
+        # Return the hit pattern of the main S2 of the processed event
         try:
-            out = self.output_plugin.last_event.main_s2.area_per_channel[:127]
+            out = self.output_plugin.last_event.main_s2.area_per_channel[:248]  # [:127]
         except AttributeError:
-            # If no main S2 is found all light was lost, return an empty hitpattern
-            out = np.zeros(127)
+            # If no main S2 is found assume all light was lost, return an empty hitpattern
+            out = np.zeros(248)  # 127
 
         return out
     
