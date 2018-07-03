@@ -23,9 +23,8 @@ class PriorPosition():
         self.positions = [pmt['position'] for pmt in pmt_config][:127]
 
     def __call__(self, pattern):
-        assert len(pattern) == 127
         # The id of the PMT that sees most light
-        max_pmt = np.argmax(pattern)
+        max_pmt = np.argmax(pattern[:127])
         
         # The position of that PMT
         pos = self.positions[max_pmt]
@@ -157,7 +156,7 @@ class ConstraintLCBSC(LCBSC):
         def grad_obj(x):
             return self.evaluate_gradient(x, t)
 
-        max_r = 47.7
+        max_r = 47.9
         xhat, _ = minimize(
             obj,
             self.model.bounds,
@@ -174,11 +173,10 @@ class ConstraintLCBSC(LCBSC):
         # Add noise for more efficient fitting of GP
         noise_x = self._add_noise(x)
 
-        ## But only within constraints if 2D
-        if len(xhat) < 3:
-            out_of_bounds = np.sum(noise_x**2, axis=1) > max_r**2
-            while len(noise_x[out_of_bounds]) > 0:
-                noise_x[out_of_bounds, :] = self._add_noise(x[out_of_bounds, :])
-                out_of_bounds = np.sum(noise_x**2, axis=1) > max_r**2
+        # Check OOB of d0 and d1
+        out_of_bounds = noise_x[:, self.d0]**2 + noise_x[:, self.d1]**2 > max_r**2
+        while np.sum(out_of_bounds) > 0:
+            noise_x[out_of_bounds, :] = self._add_noise(x[out_of_bounds])
+            out_of_bounds = noise_x[:, self.d0]**2 + noise_x[:, self.d1]**2 > max_r**2
 
         return noise_x
