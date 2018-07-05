@@ -47,6 +47,8 @@ class Model():
 
         self.r_bound = self.pax.config['DEFAULT']['tpc_radius']
         self.pmt_mask = np.array(self.pax.config['DEFAULT']['gains']) > 1
+
+        self.output_timing = False
             
     
     def change_defaults(self, z = 0.0, t = 10000,
@@ -90,9 +92,21 @@ class Model():
         # Return the hit pattern of the main S2 of the processed event
         try:
             out = self.output_plugin.last_event.main_s2.area_per_channel[:248]  # [:127]
+            if self.output_timing:
+                hit_times = self.output_plugin.last_event.main_s2.hits['center']
+                times, _ = np.histogram(hit_times - hit_times.min(),
+                                        bins=100,
+                                        range=(0, 3000)
+                                       )
+                out = {'energy': out,
+                       'time': times}
+
         except AttributeError:
             # If no main S2 is found assume all light was lost, return an empty hitpattern
             out = np.zeros(248)  # 127
+            if self.output_timing:
+                out = {'energy': out,
+                       'time': np.zeros(100)}
 
         return out
     
