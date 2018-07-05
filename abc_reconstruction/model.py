@@ -49,7 +49,15 @@ class Model():
         self.pmt_mask = np.array(self.pax.config['DEFAULT']['gains']) > 1
 
         self.output_timing = False
-            
+        self.n_pmts = 248
+
+    def hitpattern(self, s):
+        if s == 'full':
+            self.n_pmts = 248
+        elif s == 'top':
+            self.n_pmts = 127
+        else:
+            raise ValueError("Set to either 'full' or 'top'")
     
     def change_defaults(self, z = 0.0, t = 10000,
                         recoil_type = 'NR', s1_photons=50, s2_electrons = 25):
@@ -89,13 +97,14 @@ class Model():
             print("CoordinateOutOfRangeException, x=%.2f, y=%.2f" % (x, y))
             raise   # return np.ones(127) * 1e3
 
+        time_bins = 200
         # Return the hit pattern of the main S2 of the processed event
         try:
-            out = self.output_plugin.last_event.main_s2.area_per_channel[:248]  # [:127]
+            out = self.output_plugin.last_event.main_s2.area_per_channel[:self.n_pmts]
             if self.output_timing:
                 hit_times = self.output_plugin.last_event.main_s2.hits['center']
                 times, _ = np.histogram(hit_times - hit_times.min(),
-                                        bins=100,
+                                        bins=time_bins,
                                         range=(0, 3000)
                                        )
                 out = {'energy': out,
@@ -103,10 +112,10 @@ class Model():
 
         except AttributeError:
             # If no main S2 is found assume all light was lost, return an empty hitpattern
-            out = np.zeros(248)  # 127
+            out = np.zeros(self.n_pmts)
             if self.output_timing:
                 out = {'energy': out,
-                       'time': np.zeros(100)}
+                       'time': np.zeros(time_bins)}
 
         return out
     

@@ -156,7 +156,7 @@ class ConstraintLCBSC(LCBSC):
         def grad_obj(x):
             return self.evaluate_gradient(x, t)
 
-        max_r = 47.8
+        max_r = 47.7
         xhat, _ = minimize(
             obj,
             self.model.bounds,
