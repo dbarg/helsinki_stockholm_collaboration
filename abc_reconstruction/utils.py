@@ -177,6 +177,6 @@ class ConstraintLCBSC(LCBSC):
         out_of_bounds = noise_x[:, self.d0]**2 + noise_x[:, self.d1]**2 > max_r**2
         while np.sum(out_of_bounds) > 0:
             noise_x[out_of_bounds, :] = self._add_noise(x[out_of_bounds])
-            out_of_bounds = noise_x[:, self.d0]**2 + noise_x[:, self.d1]**2 > max_r**2
+            out_of_bounds = noise_x[out_of_bounds, self.d0]**2 + noise_x[out_of_bounds, self.d1]**2 > max_r**2
 
         return noise_x
