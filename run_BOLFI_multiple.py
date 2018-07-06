@@ -4,6 +4,8 @@ import sys
 import pickle
 import numpy as np
 import scipy.stats as sps
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from functools import partial
 
@@ -16,6 +18,7 @@ from abc_reconstruction.utils import PriorPosition, minimize, ConstraintLCBSC
 from elfi.methods.bo.gpy_regression import GPyRegression
 from elfi.methods.utils import ModelPrior
 
+plt.ioff()
 
 def likelihood_chisquare(y, n, w=None):
     if w is not None:
@@ -26,8 +29,8 @@ def likelihood_chisquare(y, n, w=None):
     y = np.clip(y, 1e-10, None)
     res = 2 * np.sum(y - n  + n * np.log(n/y), axis=1)
     lres = np.log(res)
-    #if lres > 10:
-    #    lres = np.ones(lres.shape) * 9
+    if lres > 10:
+        lres = np.ones(lres.shape) * 9
     return lres
 
 def chisquare(y, n, w=None):
@@ -58,32 +61,34 @@ def sqrt_euclid(y, n, w=None):
     d = np.sum(np.sqrt(np.abs(y - n)), axis=1)
     return d
 
+def max_dist(y, n, w=None):
+    if w is not None:
+        y = y[:,w.astype(bool)]
+        n = n[:,w.astype(bool)]
+
+    return np.max(np.abs(y - n), axis=1)
+
 class BOLFIModel(object):
     def build(self, model, pattern,
-              prior_pos, prior_cov = 64, r_bound = 47.8, pmt_mask = np.ones(127)):
+              prior_pos, prior_cov = 64, r_bound = 47.9, pmt_mask = np.ones(127)):
         ### Build Priors
         px = elfi.Prior(BoundedNormal_x, r_bound, prior_pos, prior_cov)
         py = elfi.Prior(BoundedNormal_y, px, r_bound, prior_pos, prior_cov)
 
         ### Build Model
         model=elfi.tools.vectorize(model)
-        Y = elfi.Simulator(model, px, py, observed=pattern)
+        Y = elfi.Simulator(model, px, py, observed=np.array([pattern]))
 
-        #likelihood_chisquare_masked = partial(likelihood_chisquare, w=pmt_mask)
-        #log_d = elfi.Distance(likelihood_chisquare_masked, Y)
+        # TODO implement PMT mask here
+        def summarize(data, key):
+            # Select either energy or time for model output.
+            return np.array([v[key] for v in data])
 
-        #chisquare_masked = partial(chisquare, w=pmt_mask)
-        #log_d = elfi.Distance(chisquare_masked, Y)
+        # Build summary stat for energy and time
+        S1 = elfi.Summary(summarize, Y, 'energy')
+        S2 = elfi.Summary(summarize, Y, 'time')
 
-        #k2_test_masked = partial(k2_test, w=pmt_mask)
-        #d = elfi.Distance(k2_test_masked, Y)
-        #log_d = elfi.Operation(np.log, d)
-
-        #sqrt_euclid_masked = partial(sqrt_euclid, w=pmt_mask)
-        #d = elfi.Distance(sqrt_euclid_masked, Y)
-        #log_d = elfi.Operation(np.log, d)
-
-        d = elfi.Distance('euclidean', Y, w=pmt_mask)
+        d = elfi.Distance('euclidean', S1, S2)
         log_d = elfi.Operation(np.log, d)
 
         # set the ELFI model so we can remove it later
@@ -100,7 +105,7 @@ class BOLFIModel(object):
                                              noise_var=[0.1, 0.1],
                                              exploration_rate=10)
 
-        bolfi = elfi.BOLFI(log_d, batch_size=1, initial_evidence=20, update_interval=1,
+        bolfi = elfi.BOLFI(log_d, batch_size=1, initial_evidence=50, update_interval=1,
                            # bounds=bounds,  # Not used when using target_model
                            target_model=target_model,
                            # acq_noise_var=[0.1, 0.1],  # Not used when using acq method
@@ -110,11 +115,8 @@ class BOLFIModel(object):
 
     def remove(self):
         # Clear the model from all nodes
-        self.model.remove_node('px')
-        self.model.remove_node('py')
-        self.model.remove_node('Y')
-        self.model.remove_node('d')
-        self.model.remove_node('log_d')
+        for node in ['px', 'py', 'Y', 'S1', 'S2', 'd', 'log_d']:
+            self.model.remove_node(node)
 
 class FM(object):
     def __init__(self, config_file):
@@ -124,9 +126,16 @@ class FM(object):
         self.model = Model(config_file)
         self.min_model = Model(config_file_min)
 
-    def change_defaults(self, **kwargs):
+    def change_defaults(self, timings=False, hitpattern='top', **kwargs):
         self.model.change_defaults(**kwargs)
         self.min_model.change_defaults(**kwargs)
+
+        if timings:
+            self.model.output_timing = True
+            self.min_model.output_timing = True
+
+        self.model.hitpattern(hitpattern)
+        self.min_model.hitpattern(hitpattern)
 
     def get_models(self):
         return self.model, self.min_model
@@ -134,7 +143,11 @@ class FM(object):
 def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
     ### Setup inits both the normal and minimal FM
     forward_models = FM('XENON1T_ABC_all_pmts_on.ini')
-    forward_models.change_defaults(s2_electrons = 25)
+    # Change default simulation parameters and simulator modes
+    forward_models.change_defaults(s2_electrons = 25,
+                                   # z = -50,
+                                   timings=True,
+                                   hitpattern='top')
 
     # Get the 'full' FM with complete pax reconstruction
     # so we also have the pax positions for comparison
@@ -151,11 +164,11 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         # The pax reconstruction of this pattern
         pax_pos = model.get_latest_pax_position()
         # The max PMT position
-        prior_pos = prior_mean(pattern)
+        prior_pos = prior_mean(pattern['energy'])
 
-        # Radial bound (1mm less than TPC radius)
-        r_bound = 47.8
-        # The PMT mask
+        # Radial bound
+        r_bound = 47.9
+        # The PMT mask (currently not used)
         pmt_mask = model.pmt_mask[:127].astype(int)
 
         # Build the ELFI model and BOLFI instance
@@ -164,7 +177,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
 
         # Run BOLFI
         try:
-            post = bolfi.fit(n_evidence=200)
+            post = bolfi.fit(n_evidence=300)
         except:
             bolfi_model.remove()
             continue
@@ -184,7 +197,11 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         plt.close()
 
         # Sample from the BOLFI fit
-        result_BOLFI = bolfi.sample(1000, info_freq=1000)
+        try:
+            result_BOLFI = bolfi.sample(1000, info_freq=1000)
+        except:
+            bolfi_model.remove()
+            continue
 
         # Get the BOLFI output
         samples = result_BOLFI.samples_array
@@ -216,6 +233,7 @@ if __name__ == '__main__':
                                                                               stop,
                                                                               folder))
 
+        #true_pos = np.loadtxt('data/truepos_outer30.txt')
         true_pos = np.loadtxt('data/truepos')
 
         run_BOLFI(true_pos, start=start, stop=stop, folder=folder)
