@@ -80,15 +80,18 @@ class BOLFIModel(object):
         Y = elfi.Simulator(model, px, py, observed=np.array([pattern]))
 
         # TODO implement PMT mask here
-        def summarize(data, key):
-            # Select either energy or time for model output.
-            return np.array([v[key] for v in data])
+        #def summarize(data, key):
+        #    # Select either energy or time for model output.
+        #    return np.array([v[key] for v in data])
+        def summarize(data):
+            return np.array([list(v['energy']) + list(v['time']) for v in data])
 
         # Build summary stat for energy and time
-        S1 = elfi.Summary(summarize, Y, 'energy')
-        S2 = elfi.Summary(summarize, Y, 'time')
+        #S1 = elfi.Summary(summarize, Y, 'energy')
+        #S2 = elfi.Summary(summarize, Y, 'time')
+        S1 = elfi.Summary(summarize, Y)
 
-        d = elfi.Distance('euclidean', S1, S2)
+        d = elfi.Distance('braycurtis', S1)
         log_d = elfi.Operation(np.log, d)
 
         # set the ELFI model so we can remove it later
@@ -115,7 +118,7 @@ class BOLFIModel(object):
 
     def remove(self):
         # Clear the model from all nodes
-        for node in ['px', 'py', 'Y', 'S1', 'S2', 'd', 'log_d']:
+        for node in ['px', 'py', 'Y', 'S1', 'd', 'log_d']:
             self.model.remove_node(node)
 
 class FM(object):
