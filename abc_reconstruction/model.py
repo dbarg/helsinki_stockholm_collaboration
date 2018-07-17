@@ -97,16 +97,12 @@ class Model():
             print("CoordinateOutOfRangeException, x=%.2f, y=%.2f" % (x, y))
             raise   # return np.ones(127) * 1e3
 
-        time_bins = 200
+        time_bins = 251
         # Return the hit pattern of the main S2 of the processed event
         try:
             out = self.output_plugin.last_event.main_s2.area_per_channel[:self.n_pmts]
             if self.output_timing:
-                hit_times = self.output_plugin.last_event.main_s2.hits['center']
-                times, _ = np.histogram(hit_times - hit_times.min(),
-                                        bins=time_bins,
-                                        range=(0, 3000)
-                                       )
+                times = self.output_plugin.last_event.main_s2.sum_waveform_top
                 out = {'energy': out,
                        'time': times}
 
