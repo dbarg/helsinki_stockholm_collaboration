@@ -105,7 +105,7 @@ class BOLFIModel(object):
 
         acquisition_method = ConstraintLCBSC(target_model,
                                              prior=ModelPrior(log_d.model),
-                                             noise_var=[0.1, 0.1],
+                                             noise_var=[1, 1],
                                              exploration_rate=10)
 
         bolfi = elfi.BOLFI(log_d, batch_size=1, initial_evidence=50, update_interval=1,
