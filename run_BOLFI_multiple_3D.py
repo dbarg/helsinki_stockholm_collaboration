@@ -23,17 +23,18 @@ plt.ioff()
 
 class PoissonPrior(elfi.Distribution):
     '''Test workaround for discrete energy distribution'''
-    def rvs(mu, loc=0, size=1, random_state=None):
-        return sps.poisson.rvs(mu=mu, loc=loc, size=size, random_state=random_state)
+    def rvs(mu, size=1, random_state=None):
+        return sps.poisson.rvs(mu=mu, loc=0, size=size, random_state=random_state)
 
-    def pdf(k, mu, loc=0):
+    def pdf(k, mu):
         return mu**k * np.exp(-mu) / gamma(k + 1)
 
 class BOLFIModel(object):
     def build(self, model, pattern,
-              prior_pos, prior_cov = 25, r_bound = 47.9, pmt_mask = np.ones(127)):
+              prior_pos, prior_cov = 25, r_bound = 47.9, pmt_mask = np.ones(127), pe=25):
         ### Build Priors
-        pe = elfi.Prior(PoissonPrior, 25)  # TEST
+        pe = elfi.Prior(PoissonPrior, pe)  # TEST
+        #pe = elfi.Prior('truncnorm', 0, 90, pe, pe**0.5)
         px = elfi.Prior(BoundedNormal_x, r_bound, prior_pos, prior_cov)
         py = elfi.Prior(BoundedNormal_y, px, r_bound, prior_pos, prior_cov)
 
@@ -58,23 +59,25 @@ class BOLFIModel(object):
         # set the ELFI model so we can remove it later
         self.model = px.model
 
+        self.d0 = self.model.parameter_names.index('px')
+        self.d1 = self.model.parameter_names.index('py')
+        self.d2 = self.model.parameter_names.index('pe')
+
         ### Setup BOLFI
         bounds = {'px':(-r_bound, r_bound),
                   'py':(-r_bound, r_bound),
-                  'pe':(10, 90)
+                  'pe':(0, 90)
                  }
+        noise_vars = [5, 5, 5]
+        noise_vars[self.d2] = 10
 
-        target_model = GPyRegression(log_d.model.parameter_names,
+        target_model = GPyRegression(self.model.parameter_names,
                                      bounds=bounds)
 
         acquisition_method = ConstraintLCBSC(target_model,
-                                             prior=ModelPrior(log_d.model),
-                                             noise_var=[10, 5, 5],
+                                             prior=ModelPrior(self.model),
+                                             noise_var=noise_vars,
                                              exploration_rate=10)
-        self.d0 = log_d.model.parameter_names.index('px')
-        self.d1 = log_d.model.parameter_names.index('py')
-        self.d2 = log_d.model.parameter_names.index('pe')
-
         acquisition_method.d0 = self.d0
         acquisition_method.d1 = self.d1
 
@@ -136,18 +139,22 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         pattern = model(truth[0], truth[1])
         # The pax reconstruction of this pattern
         pax_pos = model.get_latest_pax_position()
-        # The pax energy estimate (at z=0)
-        s2 = model.output_plugin.last_event.main_s2
-        e_cor = s2.s2_spatial_correction * s2.s2_saturation_correction
-        e = s2.area * e_cor
-        s2_secondary_sc_gain = 21.3
-        pax_e = e / s2_secondary_sc_gain
-        print('Pax energy %.2f' % pax_e)
         # The max PMT position
         #prior_pos = prior_mean(pattern['energy'])
         # The TPF position
         prior_pos = (pax_pos['PosRecTopPatternFit']['x'],
                      pax_pos['PosRecTopPatternFit']['y'])
+
+        # The pax s2 raw energy estimate (at z=0, so no lifetime correction)
+        s2 = model.output_plugin.last_event.main_s2
+        e_cor = s2.s2_spatial_correction * s2.s2_saturation_correction
+
+        # LY correction not needed, already in s2_spatial
+        #ly_cor = model.pax.simulator.s2_light_yield_map.get_value(prior_pos[0],
+        #                                                          prior_pos[1])
+        s2_secondary_sc_gain = model.pax.simulator.config['s2_secondary_sc_gain']  #  21.3
+        pax_e = s2.area * e_cor / s2_secondary_sc_gain
+        print('Pax energy %.2f' % pax_e)
                      
         # Radial bound
         r_bound = 47.9
@@ -156,7 +163,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
 
         # Build the ELFI model and BOLFI instance
         bolfi_model = BOLFIModel()
-        bolfi = bolfi_model.build(min_model, pattern, prior_pos)
+        bolfi = bolfi_model.build(min_model, pattern, prior_pos, pe=pax_e)
 
         # Run BOLFI
         try:
