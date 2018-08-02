@@ -89,7 +89,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
     ### Setup inits both the normal and minimal FM
     forward_models = FM('XENON1T_ABC_all_pmts_on.ini')
     # Change default simulation parameters and simulator modes
-    forward_models.change_defaults(s2_electrons = 10,
+    forward_models.change_defaults(s2_electrons = 25,
                                    # z = -50,
                                    timings=False,
                                    hitpattern='top')
@@ -181,7 +181,7 @@ if __name__ == '__main__':
                                                                               stop,
                                                                               folder))
 
-        true_pos = np.loadtxt('data/truepos_outer30.txt')
+        true_pos = np.loadtxt('data/truepos_full.txt')
         #true_pos = np.loadtxt('data/truepos')
 
         run_BOLFI(true_pos, start=start, stop=stop, folder=folder)
