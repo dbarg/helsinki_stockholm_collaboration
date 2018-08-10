@@ -31,10 +31,16 @@ class PoissonPrior(elfi.Distribution):
 
 class BOLFIModel(object):
     def build(self, model, pattern,
-              prior_pos, prior_cov = 25, r_bound = 47.9, pmt_mask = np.ones(127), pe=25):
+              prior_pos, prior_cov = 25, r_bound = 47.9, pmt_mask = np.ones(127), pax_e=25):
         ### Build Priors
-        pe = elfi.Prior(PoissonPrior, pe)  # TEST
-        #pe = elfi.Prior('truncnorm', 0, 90, pe, pe**0.5)
+        #pe = elfi.Prior(PoissonPrior, pax_e)  # TEST
+        # Energy prior
+        mu_e = pax_e
+        std_e = pax_e**0.5
+        pe = elfi.Prior('truncnorm', (10 - mu_e)/std_e,
+                                     (90 - mu_e)/std_e,
+                                     mu_e,
+                                     std_e)
         px = elfi.Prior(BoundedNormal_x, r_bound, prior_pos, prior_cov)
         py = elfi.Prior(BoundedNormal_y, px, r_bound, prior_pos, prior_cov)
 
@@ -66,10 +72,10 @@ class BOLFIModel(object):
         ### Setup BOLFI
         bounds = {'px':(-r_bound, r_bound),
                   'py':(-r_bound, r_bound),
-                  'pe':(0, 90)
+                  'pe':(10, 90)
                  }
         noise_vars = [5, 5, 5]
-        noise_vars[self.d2] = 10
+        #noise_vars[self.d2] = 10  # energy noise variance 
 
         target_model = GPyRegression(self.model.parameter_names,
                                      bounds=bounds)
@@ -149,11 +155,9 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         s2 = model.output_plugin.last_event.main_s2
         e_cor = s2.s2_spatial_correction * s2.s2_saturation_correction
 
-        # LY correction not needed, already in s2_spatial
-        #ly_cor = model.pax.simulator.s2_light_yield_map.get_value(prior_pos[0],
-        #                                                          prior_pos[1])
         s2_secondary_sc_gain = model.pax.simulator.config['s2_secondary_sc_gain']  #  21.3
-        pax_e = s2.area * e_cor / s2_secondary_sc_gain
+        double_pe_prob = model.pax.simulator.config['p_double_pe_emision']  #  0.15
+        pax_e = s2.area * e_cor / (s2_secondary_sc_gain * (1 + double_pe_prob))
         print('Pax energy %.2f' % pax_e)
                      
         # Radial bound
@@ -163,7 +167,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
 
         # Build the ELFI model and BOLFI instance
         bolfi_model = BOLFIModel()
-        bolfi = bolfi_model.build(min_model, pattern, prior_pos, pe=pax_e)
+        bolfi = bolfi_model.build(min_model, pattern, prior_pos, pax_e=pax_e)
 
         # Run BOLFI
         try:
@@ -206,6 +210,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         pax_pos['BOLFI_mean_e'] = {'e': means['pe']}
         pax_pos['BOLFI_median_e'] = {'e': medians[bolfi_model.d2]}
         pax_pos['pax_e'] = pax_e
+        print("BOLFI mean energy %.2f" % means['pe'])
 
         # Save the output
         with open(folder + "bolfi_results_%d.pkl" % (index + start), 'wb') as f:
@@ -226,7 +231,7 @@ if __name__ == '__main__':
                                                                               stop,
                                                                               folder))
 
-        true_pos = np.loadtxt('data/truepos_outer30.txt')
+        true_pos = np.loadtxt('data/truepos_full.txt')
         #true_pos = np.loadtxt('data/truepos')
 
         run_BOLFI(true_pos, start=start, stop=stop, folder=folder)
