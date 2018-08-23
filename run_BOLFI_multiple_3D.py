@@ -1,4 +1,4 @@
-# Run a BOLFI reconstructions
+# Run a BOLFI reconstruction
 
 import sys
 import pickle
@@ -33,16 +33,15 @@ class BOLFIModel(object):
     def build(self, model, pattern,
               prior_pos, prior_cov = 25, r_bound = 47.9, pmt_mask = np.ones(127), pax_e=25):
         ### Build Priors
-        #pe = elfi.Prior(PoissonPrior, pax_e)  # TEST
-        # Energy prior
         mu_e = pax_e
         std_e = pax_e**0.5
-        pe = elfi.Prior('truncnorm', (10 - mu_e)/std_e,
-                                     (90 - mu_e)/std_e,
-                                     mu_e,
-                                     std_e)
         px = elfi.Prior(BoundedNormal_x, r_bound, prior_pos, prior_cov)
         py = elfi.Prior(BoundedNormal_y, px, r_bound, prior_pos, prior_cov)
+        pe = elfi.Prior('truncnorm', (10 - mu_e)/std_e,
+                                     (90 - mu_e)/std_e,
+                                     25,  # mu_e,
+                                     3,  # std_e,
+                                     name='pe')
 
         ### Build Model
         model=elfi.tools.vectorize(model)
@@ -64,6 +63,7 @@ class BOLFIModel(object):
 
         # set the ELFI model so we can remove it later
         self.model = px.model
+        print(self.model.parameter_names)
 
         self.d0 = self.model.parameter_names.index('px')
         self.d1 = self.model.parameter_names.index('py')
@@ -142,7 +142,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         print("Running BOLFI on index %d" % (index + start))
 
         # The pattern to reconstruct
-        pattern = model(truth[0], truth[1])
+        pattern = model(truth[0], truth[1], 25)
         # The pax reconstruction of this pattern
         pax_pos = model.get_latest_pax_position()
         # The max PMT position
@@ -153,10 +153,12 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
 
         # The pax s2 raw energy estimate (at z=0, so no lifetime correction)
         s2 = model.output_plugin.last_event.main_s2
-        e_cor = s2.s2_spatial_correction * s2.s2_saturation_correction
 
+        # Switch to bottom spatial correction
+        e_cor = s2.s2_bottom_spatial_correction * s2.s2_saturation_correction
         s2_secondary_sc_gain = model.pax.simulator.config['s2_secondary_sc_gain']  #  21.3
         double_pe_prob = model.pax.simulator.config['p_double_pe_emision']  #  0.15
+
         pax_e = s2.area * e_cor / (s2_secondary_sc_gain * (1 + double_pe_prob))
         print('Pax energy %.2f' % pax_e)
                      
