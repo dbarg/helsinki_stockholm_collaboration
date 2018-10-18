@@ -4,6 +4,7 @@ import sys
 import pickle
 import numpy as np
 import scipy.stats as sps
+from scipy.spatial.distance import braycurtis
 from scipy.special import gamma
 import matplotlib
 matplotlib.use('Agg')
@@ -21,44 +22,59 @@ from elfi.methods.utils import ModelPrior
 
 plt.ioff()
 
+
 class PoissonPrior(elfi.Distribution):
     '''Test workaround for discrete energy distribution'''
     def rvs(mu, size=1, random_state=None):
-        return sps.poisson.rvs(mu=mu, loc=0, size=size, random_state=random_state)
+        return sps.poisson.rvs(mu=mu, loc=0,
+                               size=size, random_state=random_state)
 
     def pdf(k, mu):
         return mu**k * np.exp(-mu) / gamma(k + 1)
 
+
 class BOLFIModel(object):
     def build(self, model, pattern,
-              prior_pos, prior_cov = 25, r_bound = 47.9, pmt_mask = np.ones(127), pax_e=25):
-        ### Build Priors
+              prior_pos, prior_cov=25,
+              r_bound=47.9, pmt_mask=np.ones(127), pax_e=25):
+        # Build Priors
         mu_e = pax_e
         std_e = pax_e**0.5
         px = elfi.Prior(BoundedNormal_x, r_bound, prior_pos, prior_cov)
         py = elfi.Prior(BoundedNormal_y, px, r_bound, prior_pos, prior_cov)
-        pe = elfi.Prior('truncnorm', (10 - mu_e)/std_e,
-                                     (90 - mu_e)/std_e,
-                                     25,  # mu_e,
-                                     3,  # std_e,
-                                     name='pe')
+        # pe = elfi.Prior('truncnorm', (10 - mu_e)/std_e,
+        #                              (90 - mu_e)/std_e,
+        #                              25,  # mu_e,
+        #                              3,  # std_e,
+        #                              name='pe')
+        # pe = elfi.Prior('weibull_min', 25, 0 ,25, name='pe')
+        pe = elfi.Prior('lognorm', 0.1, 0, pax_e, name='pe')
+        # pe = elfi.Prior('uniform', 10, 90, name='pe')  # , 0.1, 0, pax_e, name='pe')
 
-        ### Build Model
-        model=elfi.tools.vectorize(model)
+        # Build Model
+        model = elfi.tools.vectorize(model)
         Y = elfi.Simulator(model, px, py, pe, observed=np.array([pattern]))
 
         def summarize(x, k):
             return np.array([e[k] for e in x])
 
-        S1 = elfi.Summary(summarize, Y, 'energy')
-        S2 = elfi.Summary(summarize, Y, 'time')
+        def energy_distance(a, b):
+            assert len(a) == len(b)
+            return np.array([sps.energy_distance(a[i], b[i]) for i in range(len(a))])
 
-        de = elfi.Distance('braycurtis', S1)
-        dt = elfi.Distance('braycurtis', S2)
+        def bray_curtis(a, b):
+            assert len(a) == len(b)
+            return np.array([braycurtis(a[i][:127], b[i][:127]) for i in range(len(a))])
+
+        # S1 = elfi.Summary(summarize, Y, 'energy')
+        # S2 = elfi.Summary(summarize, Y, 'time')
+
+        de = elfi.Distance(bray_curtis, Y)
+        dt = elfi.Distance(energy_distance, Y)  # 'braycurtis', S2)
         d = elfi.Operation(lambda a, b: a + b, de, dt)
 
         # TODO implement PMT mask here
-        #d = elfi.Distance('braycurtis', Y)
+        # d = elfi.Distance('braycurtis', Y)
         log_d = elfi.Operation(np.log, d)
 
         # set the ELFI model so we can remove it later
@@ -69,13 +85,13 @@ class BOLFIModel(object):
         self.d1 = self.model.parameter_names.index('py')
         self.d2 = self.model.parameter_names.index('pe')
 
-        ### Setup BOLFI
-        bounds = {'px':(-r_bound, r_bound),
-                  'py':(-r_bound, r_bound),
-                  'pe':(10, 90)
-                 }
+        # Setup BOLFI
+        bounds = {'px': (-r_bound, r_bound),
+                  'py': (-r_bound, r_bound),
+                  'pe': (1, 90)
+                  }
         noise_vars = [5, 5, 5]
-        #noise_vars[self.d2] = 10  # energy noise variance 
+        # noise_vars[self.d2] = 10  # energy noise variance
 
         target_model = GPyRegression(self.model.parameter_names,
                                      bounds=bounds)
@@ -97,8 +113,12 @@ class BOLFIModel(object):
 
     def remove(self):
         # Clear the model from all nodes
-        for node in ['px', 'py', 'pe', 'S1', 'S2', 'Y', 'de', 'dt', 'd', 'log_d']:
+        for node in ['px', 'py', 'pe', 'Y',
+                     #'S1', 'S2',
+                     'de', 'dt',
+                     'd', 'log_d']:
             self.model.remove_node(node)
+
 
 class FM(object):
     def __init__(self, config_file):
@@ -122,14 +142,15 @@ class FM(object):
     def get_models(self):
         return self.model, self.min_model
 
+
 def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
-    ### Setup inits both the normal and minimal FM
+    # Setup inits both the normal and minimal FM
     forward_models = FM('XENON1T_ABC_all_pmts_on.ini')
     # Change default simulation parameters and simulator modes
-    forward_models.change_defaults(s2_electrons = 25,
+    forward_models.change_defaults(s2_electrons=25,
                                    # z = -50,
-                                   timings=True,
-                                   hitpattern='full')
+                                   timings=False,  # True,
+                                   hitpattern='full')  # 'full')
 
     # Get the 'full' FM with complete pax reconstruction
     # so we also have the pax positions for comparison
@@ -146,7 +167,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         # The pax reconstruction of this pattern
         pax_pos = model.get_latest_pax_position()
         # The max PMT position
-        #prior_pos = prior_mean(pattern['energy'])
+        # prior_pos = prior_mean(pattern['energy'])
         # The TPF position
         prior_pos = (pax_pos['PosRecTopPatternFit']['x'],
                      pax_pos['PosRecTopPatternFit']['y'])
@@ -161,7 +182,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
 
         pax_e = s2.area * e_cor / (s2_secondary_sc_gain * (1 + double_pe_prob))
         print('Pax energy %.2f' % pax_e)
-                     
+
         # Radial bound
         r_bound = 47.9
         # The PMT mask (currently not used)
@@ -180,17 +201,17 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
 
         # Save the discrepancy plot
         bolfi.plot_discrepancy()
-        plt.savefig(folder + 'bolfi_disc_%d.png' % (index + start), dpi = 150)
+        plt.savefig(folder + 'bolfi_disc_%d.png' % (index + start), dpi=150)
         plt.close()
 
-        ## Save the surface plot
-        #bolfi.plot_state()
-        #plt.xlim(-50, 50)
-        #plt.ylim(-50, 50)
-        #for ax in plt.gcf().axes:
+        # Save the surface plot
+        # bolfi.plot_state()
+        # plt.xlim(-50, 50)
+        # plt.ylim(-50, 50)
+        # for ax in plt.gcf().axes:
         #        ax.add_artist(plt.Circle((0,0), 47.9, color='red', fill=False, linestyle='--'))
-        #plt.savefig(folder + 'bolfi_surf_%d.png' % (index + start), dpi = 150)
-        #plt.close()
+        # plt.savefig(folder + 'bolfi_surf_%d.png' % (index + start), dpi = 150)
+        # plt.close()
 
         # Sample from the BOLFI fit
         try:
@@ -221,6 +242,7 @@ def run_BOLFI(truepos, start=0, stop=-1, folder='./'):
         # Remove the model graph from memory so it can be reused in the next iteration
         bolfi_model.remove()
 
+
 if __name__ == '__main__':
     if len(sys.argv) in [3, 4]:
         start = int(sys.argv[1])
@@ -234,7 +256,7 @@ if __name__ == '__main__':
                                                                               folder))
 
         true_pos = np.loadtxt('data/truepos_full.txt')
-        #true_pos = np.loadtxt('data/truepos')
+        # true_pos = np.loadtxt('data/truepos')
 
         run_BOLFI(true_pos, start=start, stop=stop, folder=folder)
     else:
