@@ -9,18 +9,18 @@ from .utils import pol_to_cart
 
 class Model():
     """Implements the forward model for ABC project.
-    
+
        The forward model used here uses the full pax waveformsimulation
        as input and the pax processing for output.
-       
+
        Given a certain x,y position the model will first simulate an
        event using the waveformsimulator. Then reconstruct this event
        with the processor. It will then return the hit pattern of the
        main S2 of the event.
     """
 
-    def __init__(self, config_filename = 'XENON1T_ABC_all_pmts_on.ini',
-                 coordinate_system = 'cartesian'):
+    def __init__(self, config_filename='XENON1T_ABC_all_pmts_on.ini',
+                 coordinate_system='cartesian'):
         # Set coord system
         self.coordinate_system = coordinate_system
         # Get path to modified pax plugin
@@ -28,15 +28,15 @@ class Model():
         mod_dir = os.path.join(this_dir, 'pax_mod')
         config_path = os.path.join(this_dir, 'configuration', config_filename)
         # Setup pax using a custom configuration 'XENON1T_ABC.ini'
-        self.pax = Processor(config_paths = [config_path],
-                             config_dict = {'pax':{'plugin_paths': [mod_dir]}})
+        self.pax = Processor(config_paths=[config_path],
+                             config_dict={'pax': {'plugin_paths': [mod_dir]}})
         # Get access to the input plugin WaveformSimulatorInput
         # derived from the WaveformSimulator class
         self.input_plugin = self.pax.get_plugin_by_name('WaveformSimulatorInput')
         # Use DummyOutput, it does not write to any file but
         # stores the event in its last_event variable
         self.output_plugin = self.pax.get_plugin_by_name('DummyOutput')
-        
+
         # Dirty workaround for not using data derived spe gains if all PMTs on
         if config_filename.startswith('XENON1T_ABC_all_pmts_on'):
             gain_sigmas = [0.35 * g for g in self.pax.config['DEFAULT']['gains']]
@@ -58,9 +58,9 @@ class Model():
             self.n_pmts = 127
         else:
             raise ValueError("Set to either 'full' or 'top'")
-    
-    def change_defaults(self, z = 0.0, t = 10000,
-                        recoil_type = 'NR', s1_photons=50, s2_electrons = 25):
+
+    def change_defaults(self, z=0.0, t=10000,
+                        recoil_type='NR', s1_photons=50, s2_electrons=25):
         # Set new default options
         # str() converts are necassary to work with WaveformSimulator
         new_defaults = {'g4_id': -1,
@@ -114,7 +114,7 @@ class Model():
                        'time': np.zeros(time_bins)}
 
         return out
-    
+
     def get_latest_pax_position(self):
         # Return the reconstructed positions by pax for the last
         # processed event
